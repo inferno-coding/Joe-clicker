@@ -1,0 +1,202 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Joe Clicker</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f9f9f9;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 2rem;
+    }
+
+    #resource {
+      width: 60vw;
+      max-width: 250px;
+      cursor: pointer;
+      margin: 20px auto;
+      display: block;
+      transition: transform 0.1s ease-in-out;
+    }
+
+    #resource:active {
+      transform: scale(0.95);
+    }
+
+    #counter {
+      font-size: 1.8rem;
+      margin: 20px;
+    }
+
+    .shop-item {
+      background: #fff;
+      border-radius: 10px;
+      margin: 10px auto;
+      padding: 15px;
+      max-width: 90vw;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 1rem;
+    }
+
+    .shop-item button {
+      padding: 10px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 5px;
+      background: #4CAF50;
+      color: white;
+      cursor: pointer;
+    }
+
+    .shop-item button:active {
+      background: #45a049;
+    }
+
+    #reset-btn {
+      margin-top: 30px;
+      padding: 10px 20px;
+      font-size: 1rem;
+      background: #f44336;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    #reset-btn:active {
+      background: #d32f2f;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Face Clicker</h1>
+  <img id="resource" src="https://i.imgur.com/2cXlGXe.png" alt="Face to tap" />
+  <div id="counter">Tugs: 0</div>
+
+  <h2>Shop</h2>
+  <div id="shop"></div>
+
+  <button id="reset-btn" onclick="resetGame()">Reset Game</button>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js')
+          .then(reg => {
+            console.log('Service Worker registered', reg);
+          })
+          .catch(err => {
+            console.error('Service Worker registration failed', err);
+          });
+      });
+    }
+
+    let tugs = 0;
+    let tugsPerClick = 1;
+
+    const resource = document.getElementById('resource');
+    const counter = document.getElementById('counter');
+    const shop = document.getElementById('shop');
+
+    const items = [
+      { name: "Cursor", baseCost: 10, amount: 0, tugsPerSecond: 0.1 },
+      { name: "Grandma", baseCost: 100, amount: 0, tugsPerSecond: 1 },
+      { name: "Farm", baseCost: 1000, amount: 0, tugsPerSecond: 10 }
+    ];
+
+    function loadGame() {
+      const savedTugs = localStorage.getItem('tugs');
+      const savedItems = localStorage.getItem('items');
+      if (savedTugs !== null) tugs = parseFloat(savedTugs);
+      if (savedItems !== null) {
+        const saved = JSON.parse(savedItems);
+        saved.forEach((amt, i) => {
+          if (items[i]) items[i].amount = amt;
+        });
+      }
+    }
+
+    function saveGame() {
+      localStorage.setItem('tugs', tugs);
+      localStorage.setItem('items', JSON.stringify(items.map(item => item.amount)));
+    }
+
+    function resetGame() {
+      if (confirm("Are you sure you want to reset your progress?")) {
+        localStorage.removeItem('tugs');
+        localStorage.removeItem('items');
+        tugs = 0;
+        items.forEach(item => item.amount = 0);
+        saveGame();
+        location.reload();
+      }
+    }
+
+    resource.addEventListener('click', () => {
+      tugs += tugsPerClick;
+      updateCounter();
+    });
+
+    function updateCounter() {
+      counter.textContent = `Tugs: ${Math.floor(tugs)}`;
+    }
+
+    function generateShop() {
+      shop.innerHTML = '';
+      items.forEach((item, index) => {
+        const cost = Math.floor(item.baseCost * Math.pow(1.15, item.amount));
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'shop-item';
+        itemDiv.innerHTML = `
+          <div>
+            <strong>${item.name}</strong><br>
+            Owned: ${item.amount}<br>
+            Cost: ${cost} Tugs<br>
+            +${item.tugsPerSecond}/sec
+          </div>
+          <button onclick="buyItem(${index})">Buy</button>
+        `;
+        shop.appendChild(itemDiv);
+      });
+    }
+
+    function buyItem(index) {
+      const item = items[index];
+      const cost = Math.floor(item.baseCost * Math.pow(1.15, item.amount));
+      if (tugs >= cost) {
+        tugs -= cost;
+        item.amount++;
+        updateCounter();
+        generateShop();
+      }
+    }
+
+    // Passive tug income
+    setInterval(() => {
+      items.forEach(item => {
+        tugs += item.amount * item.tugsPerSecond / 10;
+      });
+      updateCounter();
+    }, 100);
+
+    // Auto-save every 5 seconds
+    setInterval(saveGame, 5000);
+
+    loadGame();
+    generateShop();
+    updateCounter();
+  </script>
+
+</body>
+</html>
